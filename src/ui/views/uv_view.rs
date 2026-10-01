@@ -1,3 +1,4 @@
+use crate::ui::widgets::interaction_gate::InteractionGate;
 use eframe::egui::{self, PointerButton, Sense};
 use glam::Vec2;
 
@@ -918,6 +919,7 @@ fn draw_uv_material_selector(
     let focused = state.focused_material_index();
     let selected_text = document.materials.get(focused)?.name.as_str();
     let interacting = state.is_document_edit_interacting();
+    let stroking = state.is_stroking();
     let position = egui::pos2(
         viewport_rect.left() + UV_VIEW_OVERLAY_MARGIN,
         viewport_rect.top() + UV_VIEW_OVERLAY_MARGIN,
@@ -928,7 +930,7 @@ fn draw_uv_material_selector(
         .fixed_pos(position)
         .movable(false)
         .show(ui.ctx(), |ui| {
-            let combo = ui.add_enabled_ui(!interacting, |ui| {
+            let combo = ui.availability_ui(!interacting || stroking, stroking, |ui| {
                 ui.spacing_mut().interact_size.y = UV_MATERIAL_SELECTOR_HEIGHT;
 
                 egui::ComboBox::from_id_salt("uv_view_material")

@@ -1,3 +1,4 @@
+use crate::ui::widgets::interaction_gate::InteractionGate;
 use eframe::egui;
 
 use crate::{
@@ -25,26 +26,34 @@ pub fn draw_top_bar(
     actions: EditorActionContext,
 ) -> TopBarOutput {
     let mut output = TopBarOutput::default();
+    let input_blocked = actions.transient_ui_input_blocked(state.is_stroking());
+    let actions = actions.presentation_context(state.is_stroking());
     egui::Panel::top("top_bar").show(root_ui, |ui| {
         ui.horizontal(|ui| {
             if ui.button(l10n.text("menu-file-new-project")).clicked() {
                 output.new_project_requested = true;
             }
             if ui
-                .add_enabled(
-                    actions.is_enabled(EditorAction::Undo),
-                    egui::Button::new(l10n.text("menu-edit-undo")),
-                )
-                .clicked()
+                .availability_ui(true, input_blocked, |ui| {
+                    ui.add_available(
+                        actions.is_enabled(EditorAction::Undo),
+                        egui::Button::new(l10n.text("menu-edit-undo")),
+                    )
+                    .clicked()
+                })
+                .inner
             {
                 output.view.push_action(EditorAction::Undo);
             }
             if ui
-                .add_enabled(
-                    actions.is_enabled(EditorAction::Redo),
-                    egui::Button::new(l10n.text("menu-edit-redo")),
-                )
-                .clicked()
+                .availability_ui(true, input_blocked, |ui| {
+                    ui.add_available(
+                        actions.is_enabled(EditorAction::Redo),
+                        egui::Button::new(l10n.text("menu-edit-redo")),
+                    )
+                    .clicked()
+                })
+                .inner
             {
                 output.view.push_action(EditorAction::Redo);
             }

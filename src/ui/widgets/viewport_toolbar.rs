@@ -1,3 +1,4 @@
+use crate::ui::widgets::interaction_gate::InteractionGate;
 use eframe::egui;
 use eframe::egui::{
     color_picker::{Alpha, color_picker_color32},
@@ -138,121 +139,126 @@ fn draw_3d_camera_controls(
         .width(CAMERA_POPUP_WIDTH)
         .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
         .show(|ui| {
-            ui.set_min_width(CAMERA_POPUP_WIDTH - 20.0);
-            ui.label(l10n.text("viewport-camera"));
-            ui.separator();
+            ui.availability_ui(true, state.is_stroking(), |ui| {
+                ui.set_min_width(CAMERA_POPUP_WIDTH - 20.0);
+                ui.label(l10n.text("viewport-camera"));
+                ui.separator();
 
-            let enabled = state.can_edit_viewport_camera_settings();
-            if ui
-                .add_enabled(
-                    enabled,
-                    egui::Button::new(l10n.text("viewport-reset-camera")),
-                )
-                .on_hover_text(l10n.text("viewport-reset-camera-3d-help"))
-                .clicked()
-            {
-                output.push(Command::ResetViewportCamera);
-                output.request_repaint();
-                ui.close();
-            }
-            let can_frame_all = enabled
-                && state.document().is_some_and(|document| {
-                    document
-                        .mesh
-                        .positions
-                        .iter()
-                        .any(|position| position.is_finite())
-                });
-            if ui
-                .add_enabled(
-                    can_frame_all,
-                    egui::Button::new(l10n.text("viewport-frame-all")),
-                )
-                .on_hover_text(l10n.text("viewport-frame-all-help"))
-                .clicked()
-            {
-                output.push(Command::FrameAllViewport);
-                output.request_repaint();
-                ui.close();
-            }
-            ui.separator();
+                let enabled = state.can_edit_viewport_camera_settings() || state.is_stroking();
+                if ui
+                    .add_available(
+                        enabled,
+                        egui::Button::new(l10n.text("viewport-reset-camera")),
+                    )
+                    .on_hover_text(l10n.text("viewport-reset-camera-3d-help"))
+                    .clicked()
+                {
+                    output.push(Command::ResetViewportCamera);
+                    output.request_repaint();
+                    ui.close();
+                }
+                let can_frame_all = enabled
+                    && state.document().is_some_and(|document| {
+                        document
+                            .mesh
+                            .positions
+                            .iter()
+                            .any(|position| position.is_finite())
+                    });
+                if ui
+                    .add_available(
+                        can_frame_all,
+                        egui::Button::new(l10n.text("viewport-frame-all")),
+                    )
+                    .on_hover_text(l10n.text("viewport-frame-all-help"))
+                    .clicked()
+                {
+                    output.push(Command::FrameAllViewport);
+                    output.request_repaint();
+                    ui.close();
+                }
+                ui.separator();
 
-            let mut camera = state.camera().clone();
-            ui.label(l10n.text("viewport-projection"));
-            let mut projection = camera.projection;
-            let perspective_changed = ui
-                .add_enabled(
-                    enabled,
-                    egui::RadioButton::new(
-                        projection == CameraProjection::Perspective,
-                        l10n.text("viewport-projection-perspective"),
-                    ),
-                )
-                .clicked();
-            let orthographic_changed = ui
-                .add_enabled(
-                    enabled,
-                    egui::RadioButton::new(
-                        projection == CameraProjection::Orthographic,
-                        l10n.text("viewport-projection-orthographic"),
-                    ),
-                )
-                .clicked();
-            if perspective_changed {
-                projection = CameraProjection::Perspective;
-            } else if orthographic_changed {
-                projection = CameraProjection::Orthographic;
-            }
-            if projection != camera.projection {
-                camera.set_projection(projection);
-                output.push(Command::SetCamera(camera.clone()));
-                output.request_repaint();
-            }
+                let mut camera = state.camera().clone();
+                ui.label(l10n.text("viewport-projection"));
+                let mut projection = camera.projection;
+                let perspective_changed = ui
+                    .add_available(
+                        enabled,
+                        egui::RadioButton::new(
+                            projection == CameraProjection::Perspective,
+                            l10n.text("viewport-projection-perspective"),
+                        ),
+                    )
+                    .clicked();
+                let orthographic_changed = ui
+                    .add_available(
+                        enabled,
+                        egui::RadioButton::new(
+                            projection == CameraProjection::Orthographic,
+                            l10n.text("viewport-projection-orthographic"),
+                        ),
+                    )
+                    .clicked();
+                if perspective_changed {
+                    projection = CameraProjection::Perspective;
+                } else if orthographic_changed {
+                    projection = CameraProjection::Orthographic;
+                }
+                if projection != camera.projection {
+                    camera.set_projection(projection);
+                    output.push(Command::SetCamera(camera.clone()));
+                    output.request_repaint();
+                }
 
-            match camera.projection {
-                CameraProjection::Perspective => {
-                    let mut degrees = camera.fov_y_radians.to_degrees();
-                    if ui
-                        .add_enabled(
-                            enabled,
-                            egui::DragValue::new(&mut degrees)
-                                .prefix(format!("{} ", l10n.text("viewport-field-of-view-prefix")))
-                                .suffix("°")
-                                .range(MIN_FOV_Y_DEGREES..=MAX_FOV_Y_DEGREES)
-                                .speed(0.25)
-                                .max_decimals(1),
-                        )
-                        .on_hover_text(l10n.text("viewport-field-of-view-help"))
-                        .changed()
-                    {
-                        camera.set_fov_y_degrees(degrees);
-                        output.push(Command::SetCamera(camera));
-                        output.request_repaint();
+                match camera.projection {
+                    CameraProjection::Perspective => {
+                        let mut degrees = camera.fov_y_radians.to_degrees();
+                        if ui
+                            .add_available(
+                                enabled,
+                                egui::DragValue::new(&mut degrees)
+                                    .prefix(format!(
+                                        "{} ",
+                                        l10n.text("viewport-field-of-view-prefix")
+                                    ))
+                                    .suffix("°")
+                                    .range(MIN_FOV_Y_DEGREES..=MAX_FOV_Y_DEGREES)
+                                    .speed(0.25)
+                                    .max_decimals(1),
+                            )
+                            .on_hover_text(l10n.text("viewport-field-of-view-help"))
+                            .changed()
+                        {
+                            camera.set_fov_y_degrees(degrees);
+                            output.push(Command::SetCamera(camera));
+                            output.request_repaint();
+                        }
+                    }
+                    CameraProjection::Orthographic => {
+                        let mut height = camera.orthographic_height;
+                        if ui
+                            .add_available(
+                                enabled,
+                                egui::DragValue::new(&mut height)
+                                    .prefix(format!(
+                                        "{} ",
+                                        l10n.text("viewport-orthographic-height-prefix")
+                                    ))
+                                    .range(MIN_ORTHOGRAPHIC_HEIGHT..=MAX_ORTHOGRAPHIC_HEIGHT)
+                                    .speed(0.01)
+                                    .max_decimals(3),
+                            )
+                            .on_hover_text(l10n.text("viewport-orthographic-height-help"))
+                            .changed()
+                        {
+                            camera.set_orthographic_height(height);
+                            output.push(Command::SetCamera(camera));
+                            output.request_repaint();
+                        }
                     }
                 }
-                CameraProjection::Orthographic => {
-                    let mut height = camera.orthographic_height;
-                    if ui
-                        .add_enabled(
-                            enabled,
-                            egui::DragValue::new(&mut height)
-                                .prefix(format!(
-                                    "{} ",
-                                    l10n.text("viewport-orthographic-height-prefix")
-                                ))
-                                .range(MIN_ORTHOGRAPHIC_HEIGHT..=MAX_ORTHOGRAPHIC_HEIGHT)
-                                .speed(0.01)
-                                .max_decimals(3),
-                        )
-                        .on_hover_text(l10n.text("viewport-orthographic-height-help"))
-                        .changed()
-                    {
-                        camera.set_orthographic_height(height);
-                        output.push(Command::SetCamera(camera));
-                        output.request_repaint();
-                    }
-                }
-            }
+            });
         })
         .is_some();
 
@@ -276,21 +282,23 @@ fn draw_uv_camera_controls(
         .width(CAMERA_POPUP_WIDTH)
         .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
         .show(|ui| {
-            ui.set_min_width(CAMERA_POPUP_WIDTH - 20.0);
-            ui.label(l10n.text("viewport-camera"));
-            ui.separator();
-            if ui
-                .add_enabled(
-                    state.document().is_some() && state.is_tool_idle(),
-                    egui::Button::new(l10n.text("viewport-reset-camera")),
-                )
-                .on_hover_text(l10n.text("viewport-reset-camera-uv-help"))
-                .clicked()
-            {
-                output.push(Command::ResetUvViewTransform);
-                output.request_repaint();
-                ui.close();
-            }
+            ui.availability_ui(true, state.is_stroking(), |ui| {
+                ui.set_min_width(CAMERA_POPUP_WIDTH - 20.0);
+                ui.label(l10n.text("viewport-camera"));
+                ui.separator();
+                if ui
+                    .add_available(
+                        state.document().is_some() && (state.is_tool_idle() || state.is_stroking()),
+                        egui::Button::new(l10n.text("viewport-reset-camera")),
+                    )
+                    .on_hover_text(l10n.text("viewport-reset-camera-uv-help"))
+                    .clicked()
+                {
+                    output.push(Command::ResetUvViewTransform);
+                    output.request_repaint();
+                    ui.close();
+                }
+            });
         })
         .is_some();
 
@@ -318,7 +326,8 @@ fn draw_mirror_controls(
         "builtin.icon.flip",
         mirror_options.x_enabled,
         popup_was_open,
-        state.is_tool_idle(),
+        state.is_tool_idle() || state.is_stroking(),
+        state.is_stroking(),
         &l10n.text("viewport-toggle-x-mirror"),
         &l10n.text("viewport-x-mirror-settings"),
     );
@@ -340,7 +349,7 @@ fn draw_mirror_controls(
 
             let mut show_plane = mirror_options.show_x_plane;
             if ui
-                .add_enabled(
+                .add_available(
                     mirror_options.x_enabled,
                     egui::Checkbox::new(&mut show_plane, l10n.text("viewport-show-mirror-plane")),
                 )
@@ -353,12 +362,21 @@ fn draw_mirror_controls(
 
             let mut plane_x = mirror_options.x_plane;
             if ui
-                .add_enabled(
-                    state.is_tool_idle(),
-                    egui::DragValue::new(&mut plane_x)
-                        .prefix(format!("{} ", l10n.text("viewport-mirror-center-x-prefix")))
-                        .speed(0.01),
+                .availability_ui(
+                    state.is_tool_idle() || state.is_stroking(),
+                    state.is_stroking(),
+                    |ui| {
+                        ui.add(
+                            egui::DragValue::new(&mut plane_x)
+                                .prefix(format!(
+                                    "{} ",
+                                    l10n.text("viewport-mirror-center-x-prefix")
+                                ))
+                                .speed(0.01),
+                        )
+                    },
                 )
+                .inner
                 .on_hover_text(l10n.text("viewport-mirror-center-x-help"))
                 .changed()
             {
@@ -422,6 +440,7 @@ fn draw_wireframe_controls(
         visible,
         popup_open,
         true,
+        false,
         &l10n.text("viewport-toggle-wireframe"),
         &l10n.text("viewport-wireframe-settings"),
     );
@@ -561,7 +580,7 @@ fn draw_viewport_settings(
                 args.set("degrees", transform.rotation_radians.to_degrees());
                 ui.label(l10n.format("viewport-rotation", Some(&args)));
                 if ui
-                    .add_enabled(
+                    .add_available(
                         transform.rotation_radians.abs() > f32::EPSILON,
                         egui::Button::new(l10n.text("viewport-reset-rotation")),
                     )
@@ -809,18 +828,23 @@ fn split_icon_button(
     active: bool,
     popup_open: bool,
     main_enabled: bool,
+    main_input_blocked: bool,
     main_tooltip: &str,
     menu_tooltip: &str,
 ) -> (egui::Response, egui::Response) {
-    let main = icon_button_with_rounding(
-        ui,
-        icons,
-        icon_id,
-        active,
-        main_enabled,
-        ButtonRounding::Left,
-    )
-    .on_hover_text(main_tooltip);
+    let main = ui
+        .availability_ui(true, main_input_blocked, |ui| {
+            icon_button_with_rounding(
+                ui,
+                icons,
+                icon_id,
+                active,
+                main_enabled,
+                ButtonRounding::Left,
+            )
+        })
+        .inner
+        .on_hover_text(main_tooltip);
     let menu = menu_button(ui, popup_open, ButtonRounding::Right).on_hover_text(menu_tooltip);
     (main, menu)
 }

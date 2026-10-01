@@ -1,3 +1,4 @@
+use crate::ui::widgets::interaction_gate::InteractionGate;
 use eframe::egui;
 
 use super::material_swatch::paint_material_swatch;
@@ -48,6 +49,7 @@ pub fn draw_materials_textures_panel(
     if document.has_materials() {
         let mut focused = state.focused_material_index();
         let interacting = state.is_document_edit_interacting();
+        let stroking = state.is_stroking();
         if let Some(material) = document.materials.get(focused) {
             ui.separator();
             egui::Frame::NONE
@@ -62,10 +64,11 @@ pub fn draw_materials_textures_panel(
                         focused,
                         material,
                         interacting,
+                        stroking,
                     ));
                 });
         }
-        ui.add_enabled_ui(!interacting, |ui| {
+        ui.availability_ui(!interacting || stroking, stroking, |ui| {
             egui::ScrollArea::vertical()
                 .id_salt("workspace_materials_list_view")
                 .max_height(240.0)
@@ -107,7 +110,7 @@ pub fn draw_materials_textures_panel(
                                             .is_some_and(|maximum| size <= maximum);
                                         let selected = material.texture_size == [size; 2];
                                         let response = ui
-                                            .add_enabled_ui(supported, |ui| {
+                                            .add_available_ui(supported, |ui| {
                                                 ui.selectable_label(
                                                     selected,
                                                     format!("{size} x {size}"),
@@ -364,11 +367,12 @@ pub fn draw_material_properties(
     material_index: usize,
     material: &MaterialData,
     interacting: bool,
+    stroking: bool,
 ) -> ViewOutput {
     let mut output = ViewOutput::default();
 
     let mut settings = material.render_settings;
-    ui.add_enabled_ui(!interacting, |ui| {
+    ui.availability_ui(!interacting || stroking, stroking, |ui| {
         egui::ComboBox::from_id_salt("material_rendering_mode")
             .selected_text(match settings.render_mode {
                 MaterialRenderMode::Opaque => l10n.text("material-rendering-opaque"),
@@ -393,24 +397,25 @@ pub fn draw_material_properties(
                 );
             });
     });
-    ui.add_enabled(
-        !interacting,
-        egui::Checkbox::new(
+    ui.availability_ui(!interacting || stroking, stroking, |ui| {
+        ui.add(egui::Checkbox::new(
             &mut settings.double_sided,
             l10n.text("material-double-sided"),
-        ),
-    )
+        ))
+    })
+    .inner
     .on_hover_text(if settings.double_sided {
         l10n.text("material-double-sided-enabled-help")
     } else {
         l10n.text("material-double-sided-disabled-help")
     });
     if settings.render_mode == MaterialRenderMode::Cutoff {
-        ui.add_enabled(
-            !interacting,
-            egui::Slider::new(&mut settings.alpha_cutoff, 0..=255)
-                .text(l10n.text("material-alpha-cutoff")),
-        );
+        ui.availability_ui(!interacting || stroking, stroking, |ui| {
+            ui.add(
+                egui::Slider::new(&mut settings.alpha_cutoff, 0..=255)
+                    .text(l10n.text("material-alpha-cutoff")),
+            )
+        });
     }
 
     if settings != material.render_settings {

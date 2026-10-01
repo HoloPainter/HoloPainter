@@ -58,6 +58,21 @@ impl EditorActionContext {
         }
     }
 
+    /// UI-only snapshot: transient restrictions must still gate input separately.
+    pub fn presentation_context(mut self, stroking: bool) -> Self {
+        if stroking {
+            self.tool_interacting = false;
+        }
+        if self.edit_block_reason == Some(EditorActionBlockReason::RenderCommitPending) {
+            self.edit_block_reason = None;
+        }
+        self
+    }
+
+    pub fn transient_ui_input_blocked(self, stroking: bool) -> bool {
+        stroking || self.edit_block_reason == Some(EditorActionBlockReason::RenderCommitPending)
+    }
+
     pub fn is_enabled(self, action: EditorAction) -> bool {
         if self.editing_blocked() {
             return false;
@@ -134,6 +149,54 @@ impl EditorAction {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn presentation_context_keeps_execution_blocked_and_intrinsic_restrictions_visible() {
+        let context = EditorActionContext {
+            has_document: true,
+            can_undo: true,
+            can_redo: false,
+            can_deselect: false,
+            can_delete_selected_pixels: false,
+            tool_interacting: true,
+            decal_session_active: false,
+            edit_block_reason: None,
+            keyboard_input_owned_by_ui: false,
+        };
+        assert!(!context.is_enabled(EditorAction::Undo));
+        assert!(!context.shortcut_is_enabled(EditorAction::Undo));
+        assert!(context.transient_ui_input_blocked(true));
+        let presentation = context.presentation_context(true);
+        assert!(presentation.is_enabled(EditorAction::Undo));
+        assert!(!presentation.is_enabled(EditorAction::Redo));
+        assert!(!presentation.is_enabled(EditorAction::Deselect));
+        assert!(
+            !context
+                .presentation_context(false)
+                .is_enabled(EditorAction::Undo)
+        );
+        let pending = EditorActionContext {
+            tool_interacting: false,
+            edit_block_reason: Some(EditorActionBlockReason::RenderCommitPending),
+            ..context
+        };
+        assert!(pending.transient_ui_input_blocked(false));
+        assert!(!pending.is_enabled(EditorAction::Undo));
+        assert!(
+            pending
+                .presentation_context(false)
+                .is_enabled(EditorAction::Undo)
+        );
+        let fatal = EditorActionContext {
+            edit_block_reason: Some(EditorActionBlockReason::FatalRendererError),
+            ..pending
+        };
+        assert!(
+            !fatal
+                .presentation_context(false)
+                .is_enabled(EditorAction::Undo)
+        );
+    }
 
     #[test]
     fn project_save_requires_an_idle_unblocked_document() {

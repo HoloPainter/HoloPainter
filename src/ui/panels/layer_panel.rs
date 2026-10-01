@@ -1,3 +1,4 @@
+use crate::ui::widgets::interaction_gate::InteractionGate;
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 use eframe::egui;
@@ -551,50 +552,54 @@ pub fn draw_layer_panel(
     let mut command: Option<Command> = None;
     let mut ui_request: Option<UiRequest> = None;
 
-    ui.add_enabled_ui(ui_enabled, |ui| {
-        egui::Frame::NONE
-            .inner_margin(egui::Margin::same(LAYER_PANEL_HEADER_MARGIN))
-            .show(ui, |ui| {
-                draw_header(
-                    ui,
-                    l10n,
-                    document,
-                    active_layer,
-                    active_target,
-                    &ui_state.selected_layer_ids,
-                    icons,
-                    current_color,
-                    &mut command,
-                );
-            });
+    ui.availability_ui(
+        ui_enabled || state.is_stroking(),
+        state.is_stroking(),
+        |ui| {
+            egui::Frame::NONE
+                .inner_margin(egui::Margin::same(LAYER_PANEL_HEADER_MARGIN))
+                .show(ui, |ui| {
+                    draw_header(
+                        ui,
+                        l10n,
+                        document,
+                        active_layer,
+                        active_target,
+                        &ui_state.selected_layer_ids,
+                        icons,
+                        current_color,
+                        &mut command,
+                    );
+                });
 
-        ui.separator();
+            ui.separator();
 
-        egui::ScrollArea::vertical()
-            .id_salt("layer_panel_rows_scroll")
-            .auto_shrink([false, false])
-            .show_viewport(ui, |ui, _viewport| {
-                ui.set_width(ui.available_width());
-                ui.spacing_mut().item_spacing.y = 0.0;
-                let scroll_rect = ui.clip_rect();
-                draw_rows(
-                    ui,
-                    l10n,
-                    document,
-                    &rows,
-                    active_layer,
-                    active_target,
-                    focused_material_index,
-                    icons,
-                    ui_state,
-                    &mut command,
-                    &mut ui_request,
-                    scroll_rect,
-                );
-            });
-    });
+            egui::ScrollArea::vertical()
+                .id_salt("layer_panel_rows_scroll")
+                .auto_shrink([false, false])
+                .show_viewport(ui, |ui, _viewport| {
+                    ui.set_width(ui.available_width());
+                    ui.spacing_mut().item_spacing.y = 0.0;
+                    let scroll_rect = ui.clip_rect();
+                    draw_rows(
+                        ui,
+                        l10n,
+                        document,
+                        &rows,
+                        active_layer,
+                        active_target,
+                        focused_material_index,
+                        icons,
+                        ui_state,
+                        &mut command,
+                        &mut ui_request,
+                        scroll_rect,
+                    );
+                });
+        },
+    );
 
-    if !ui_enabled {
+    if !ui_enabled && !state.is_stroking() {
         egui::Frame::NONE
             .inner_margin(egui::Margin::same(LAYER_PANEL_HEADER_MARGIN))
             .show(ui, |ui| {
@@ -704,7 +709,7 @@ fn draw_header(
         }
         if toolbar_layout == LayerToolbarLayout::Full {
             if ui
-                .add_enabled_ui(can_duplicate_layer, |ui| {
+                .add_available_ui(can_duplicate_layer, |ui| {
                     icon_button(
                         ui,
                         icons,
@@ -721,7 +726,7 @@ fn draw_header(
                 *command = selection.duplicate_command(active_layer);
             }
             if ui
-                .add_enabled_ui(can_merge_layers, |ui| {
+                .add_available_ui(can_merge_layers, |ui| {
                     icon_button(
                         ui,
                         icons,
@@ -746,7 +751,7 @@ fn draw_header(
                 l10n.text("layer-panel-lock-selected")
             };
             if ui
-                .add_enabled_ui(!selected_layers.is_empty(), |ui| {
+                .add_available_ui(!selected_layers.is_empty(), |ui| {
                     icon_button_with_tint_alpha(
                         ui,
                         icons,
@@ -769,7 +774,7 @@ fn draw_header(
             if !can_add_mask {
                 egui::Popup::close_id(ui.ctx(), popup_id);
             }
-            ui.add_enabled_ui(can_add_mask, |ui| {
+            ui.add_available_ui(can_add_mask, |ui| {
                 let popup_open = egui::Popup::is_id_open(ui.ctx(), popup_id);
                 let response = icon_button(
                     ui,
@@ -800,7 +805,7 @@ fn draw_header(
                 DeleteAction::Mask => l10n.text("layer-panel-delete-mask"),
             };
             if ui
-                .add_enabled_ui(can_delete, |ui| {
+                .add_available_ui(can_delete, |ui| {
                     icon_button(
                         ui,
                         icons,
@@ -848,8 +853,8 @@ fn draw_header(
     let controls_layout = composite_controls_layout(ui.available_width());
     let mut draw_controls = |ui: &mut egui::Ui| {
         let Some(active_node) = active_node else {
-            ui.add_enabled(false, egui::Label::new(l10n.text("layer-panel-blend")));
-            ui.add_enabled(false, egui::Label::new(l10n.text("field-opacity")));
+            ui.add_available(false, egui::Label::new(l10n.text("layer-panel-blend")));
+            ui.add_available(false, egui::Label::new(l10n.text("field-opacity")));
             return;
         };
 
@@ -867,7 +872,7 @@ fn draw_header(
             && selected_layers
                 .iter()
                 .all(|layer_id| tree.can_set_layer_opacity(*layer_id));
-        let response = ui.add_enabled_ui(!selected_layers.is_empty(), |ui| {
+        let response = ui.add_available_ui(!selected_layers.is_empty(), |ui| {
             let mut new_composite_mode = composite_mode.unwrap_or_else(|| {
                 layer_panel_composite_mode(
                     active_node.props.blend_mode,
@@ -882,7 +887,7 @@ fn draw_header(
                 combo = combo.width(ui.available_width());
             }
             combo.show_ui(ui, |ui| {
-                ui.add_enabled_ui(can_edit_composite, |ui| {
+                ui.add_available_ui(can_edit_composite, |ui| {
                     if can_edit_group_composite {
                         ui.selectable_value(
                             &mut new_composite_mode,
@@ -931,7 +936,7 @@ fn draw_header(
             }
 
             let mut new_opacity = active_node.effective_opacity();
-            let opacity_response = ui.add_enabled_ui(can_edit_opacity, |ui| {
+            let opacity_response = ui.add_available_ui(can_edit_opacity, |ui| {
                 let slider = egui::Slider::new(&mut new_opacity, 0.0..=1.0).show_value(true);
                 if controls_layout == CompositeControlsLayout::Vertical {
                     ui.add_sized([ui.available_width(), ui.spacing().interact_size.y], slider)
@@ -1031,7 +1036,7 @@ fn draw_header_overflow_menu(
             }
 
             if ui
-                .add_enabled(
+                .add_available(
                     selection.can_duplicate,
                     egui::Button::new(l10n.text("layer-panel-duplicate")),
                 )
@@ -1041,7 +1046,7 @@ fn draw_header_overflow_menu(
                 close_header_menu(ui, Some(popup_id));
             }
             if ui
-                .add_enabled(
+                .add_available(
                     selection.can_merge,
                     egui::Button::new(l10n.text("layer-panel-merge")),
                 )
@@ -1056,7 +1061,7 @@ fn draw_header_overflow_menu(
             } else {
                 l10n.text("layer-panel-lock-selected")
             };
-            let lock_response = ui.add_enabled(
+            let lock_response = ui.add_available(
                 !selection.selected_layers.is_empty(),
                 egui::Button::new(lock_label),
             );
@@ -1072,7 +1077,7 @@ fn draw_header_overflow_menu(
 
             if include_all_actions {
                 ui.separator();
-                ui.add_enabled_ui(can_add_mask, |ui| {
+                ui.add_available_ui(can_add_mask, |ui| {
                     ui.menu_button(l10n.text("layer-panel-add-mask"), |ui| {
                         draw_add_mask_menu_contents(
                             ui,
@@ -1089,7 +1094,7 @@ fn draw_header_overflow_menu(
                     DeleteAction::Mask => l10n.text("layer-panel-delete-mask"),
                 };
                 if ui
-                    .add_enabled(can_delete, egui::Button::new(delete_label))
+                    .add_available(can_delete, egui::Button::new(delete_label))
                     .clicked()
                 {
                     *command = Some(match delete_action {
@@ -1163,7 +1168,7 @@ fn draw_add_mask_menu_contents(
         close_header_menu(ui, close_popup_id);
     }
     if ui
-        .add_enabled(
+        .add_available(
             can_add_mask_from_selection,
             egui::Button::new(l10n.text("layer-panel-add-mask-from-selection")),
         )
@@ -1197,7 +1202,7 @@ fn draw_layer_row_context_menu(
     let is_multi_selection = selection.is_multi_selection();
 
     if ui
-        .add_enabled(
+        .add_available(
             !is_multi_selection,
             egui::Button::new(l10n.text("layer-panel-context-rename")),
         )
@@ -1215,7 +1220,7 @@ fn draw_layer_row_context_menu(
         l10n.text("layer-panel-context-duplicate")
     };
     if ui
-        .add_enabled(selection.can_duplicate, egui::Button::new(duplicate_label))
+        .add_available(selection.can_duplicate, egui::Button::new(duplicate_label))
         .clicked()
     {
         *command = selection.duplicate_command(row.layer_id);
@@ -1224,7 +1229,7 @@ fn draw_layer_row_context_menu(
 
     if is_multi_selection {
         if ui
-            .add_enabled(
+            .add_available(
                 selection.can_merge,
                 egui::Button::new(l10n.text("layer-panel-context-merge-selected")),
             )
@@ -1235,7 +1240,7 @@ fn draw_layer_row_context_menu(
         }
     } else if matches!(row.content, LayerContent::Group { .. })
         && ui
-            .add_enabled(
+            .add_available(
                 selection.can_merge,
                 egui::Button::new(l10n.text("layer-panel-context-merge-group")),
             )
@@ -1249,7 +1254,7 @@ fn draw_layer_row_context_menu(
         row.content,
         LayerContent::EmbeddedImage { .. } | LayerContent::SolidFill { .. }
     ) && ui
-        .add_enabled(
+        .add_available(
             tree.can_rasterize_layer(row.layer_id),
             egui::Button::new(l10n.text("layer-panel-context-rasterize")),
         )
@@ -1271,7 +1276,7 @@ fn draw_layer_row_context_menu(
 
         let can_add_mask = !is_multi_selection && tree.can_add_layer_mask(row.layer_id);
         if ui
-            .add_enabled(
+            .add_available(
                 can_add_mask,
                 egui::Button::new(l10n.text("layer-panel-add-white-mask")),
             )
@@ -1284,7 +1289,7 @@ fn draw_layer_row_context_menu(
             ui.close();
         }
         if ui
-            .add_enabled(
+            .add_available(
                 can_add_mask,
                 egui::Button::new(l10n.text("layer-panel-add-black-mask")),
             )
@@ -1297,7 +1302,7 @@ fn draw_layer_row_context_menu(
             ui.close();
         }
         if ui
-            .add_enabled(
+            .add_available(
                 can_add_mask && document.active_selection.is_active(),
                 egui::Button::new(l10n.text("layer-panel-add-mask-from-selection")),
             )
@@ -1330,7 +1335,7 @@ fn draw_layer_row_context_menu(
         (false, false) => l10n.text("layer-panel-context-lock"),
     };
     if ui
-        .add_enabled(
+        .add_available(
             !selection.selected_layers.is_empty(),
             egui::Button::new(lock_label),
         )
@@ -1348,7 +1353,7 @@ fn draw_layer_row_context_menu(
         l10n.text("layer-panel-context-delete")
     };
     if ui
-        .add_enabled(selection.can_delete, egui::Button::new(delete_label))
+        .add_available(selection.can_delete, egui::Button::new(delete_label))
         .clicked()
     {
         *command = selection.delete_command();
@@ -1372,7 +1377,7 @@ fn draw_layer_mask_context_menu(
         l10n.text("layer-panel-context-enable-mask")
     };
     if ui
-        .add_enabled(can_edit_mask, egui::Button::new(toggle_label))
+        .add_available(can_edit_mask, egui::Button::new(toggle_label))
         .clicked()
     {
         *command = Some(Command::SetLayerMaskEnabled {
@@ -1385,7 +1390,7 @@ fn draw_layer_mask_context_menu(
     ui.separator();
 
     if ui
-        .add_enabled(
+        .add_available(
             tree.can_apply_layer_mask(layer_id),
             egui::Button::new(l10n.text("layer-panel-context-apply-mask")),
         )
@@ -1395,7 +1400,7 @@ fn draw_layer_mask_context_menu(
         ui.close();
     }
     if ui
-        .add_enabled(
+        .add_available(
             can_edit_mask,
             egui::Button::new(l10n.text("layer-panel-context-delete-mask")),
         )
@@ -2095,7 +2100,7 @@ fn draw_solid_fill_row(
 
     let popup_id = egui::Id::new(("layer_panel_solid_fill_color_popup", row.layer_id));
     let fill_response = ui
-        .add_enabled_ui(!(row.locked || row.locked_by_parent), |ui| {
+        .add_available_ui(!(row.locked || row.locked_by_parent), |ui| {
             solid_fill_thumbnail_button(ui, ROW_THUMBNAIL_SIZE, fill_selected, color, icons)
         })
         .inner
@@ -2126,7 +2131,7 @@ fn draw_solid_fill_row(
         .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
         .show(|ui| {
             ui.set_min_width(260.0);
-            ui.add_enabled_ui(!(row.locked || row.locked_by_parent), |ui| {
+            ui.add_available_ui(!(row.locked || row.locked_by_parent), |ui| {
                 let mut edited_color = color;
                 let content = draw_color_panel_content(
                     ui,
@@ -2218,7 +2223,7 @@ fn draw_adjustment_row(
     ui.add_space(ROW_TREE_GAP + row.depth.saturating_sub(1) as f32 * ROW_INDENT);
 
     let icon_response = ui
-        .add_enabled_ui(!(row.locked || row.locked_by_parent), |ui| {
+        .add_available_ui(!(row.locked || row.locked_by_parent), |ui| {
             icon_button(
                 ui,
                 icons,
@@ -3582,7 +3587,7 @@ fn icon_button_with_tint_alpha(
         }
 
         if let Some(texture) = icons.texture(icon_id) {
-            let tint = if ui.is_enabled() {
+            let tint = if crate::ui::widgets::interaction_gate::visually_available(ui) {
                 visuals.fg_stroke.color
             } else {
                 ui.visuals().widgets.noninteractive.fg_stroke.color

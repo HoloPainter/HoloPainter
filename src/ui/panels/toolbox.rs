@@ -1,3 +1,4 @@
+use crate::ui::widgets::interaction_gate::InteractionGate;
 use eframe::egui;
 use glam::Vec2;
 
@@ -343,7 +344,7 @@ pub fn draw_tool_list(
     ui.add_space(2.0);
     ui.horizontal(|ui| {
         let add = ui
-            .add_enabled_ui(can_add, |ui| {
+            .add_available_ui(can_add, |ui| {
                 tool_list_icon_button(ui, icons, "builtin.icon.add")
             })
             .inner
@@ -376,7 +377,7 @@ pub fn draw_tool_list(
         }
 
         let delete = ui
-            .add_enabled_ui(can_delete, |ui| {
+            .add_available_ui(can_delete, |ui| {
                 tool_list_icon_button(ui, icons, "builtin.icon.delete")
             })
             .inner
@@ -664,7 +665,7 @@ fn tool_list_icon_button(
         let texture = icons
             .texture(icon_id)
             .unwrap_or_else(|| panic!("unknown builtin icon id: {icon_id}"));
-        let tint = if ui.is_enabled() {
+        let tint = if crate::ui::widgets::interaction_gate::visually_available(ui) {
             visuals.fg_stroke.color
         } else {
             ui.visuals().widgets.noninteractive.fg_stroke.color
@@ -1147,7 +1148,7 @@ fn paint_icon_preview(ui: &egui::Ui, rect: egui::Rect, icons: &UiIconRegistry, i
         egui::pos2(rect.left(), icon_top),
         egui::Vec2::splat(TOOL_PREVIEW_ICON_SIZE),
     );
-    let tint = if ui.is_enabled() {
+    let tint = if crate::ui::widgets::interaction_gate::visually_available(ui) {
         egui::Color32::from_gray(40)
     } else {
         egui::Color32::from_gray(130)
@@ -1197,7 +1198,7 @@ fn tool_group_icon_button(
             );
         }
 
-        let tint = if ui.is_enabled() {
+        let tint = if crate::ui::widgets::interaction_gate::visually_available(ui) {
             visuals.fg_stroke.color
         } else {
             ui.visuals().widgets.noninteractive.fg_stroke.color

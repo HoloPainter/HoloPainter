@@ -1,3 +1,4 @@
+use crate::ui::widgets::interaction_gate::InteractionGate;
 use eframe::egui;
 
 use crate::{
@@ -382,7 +383,7 @@ fn draw_curves(
             .curves_selected_point
             .is_some_and(|index| index < channel.points().len() && channel.points().len() > 2);
         if ui
-            .add_enabled(
+            .add_available(
                 can_delete,
                 egui::Button::new(l10n.text("adjustment-delete-point")),
             )

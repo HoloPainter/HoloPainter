@@ -1,3 +1,4 @@
+use crate::ui::widgets::interaction_gate::InteractionGate;
 use eframe::egui;
 
 use crate::{
@@ -34,7 +35,8 @@ pub fn draw_mesh_panel(
     }
 
     let interacting = state.is_document_edit_interacting();
-    ui.add_enabled_ui(!interacting, |ui| {
+    let stroking = state.is_stroking();
+    ui.availability_ui(!interacting || stroking, stroking, |ui| {
         egui::ScrollArea::vertical()
             .id_salt("workspace_meshes_list_view")
             .auto_shrink([false, false])

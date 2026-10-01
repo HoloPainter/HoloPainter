@@ -36,7 +36,7 @@ pub fn draw_visibility_toggle(
 
         let icon_id = visibility_icon_id(visible);
         if let Some(texture) = icons.texture(icon_id) {
-            let tint = if ui.is_enabled() {
+            let tint = if crate::ui::widgets::interaction_gate::visually_available(ui) {
                 if visible {
                     visuals.fg_stroke.color
                 } else {

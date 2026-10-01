@@ -1,3 +1,4 @@
+use crate::ui::widgets::interaction_gate::InteractionGate;
 use eframe::egui;
 
 use crate::{
@@ -133,14 +134,15 @@ pub fn draw_adjustment_editor_window(
             ui.label(l10n.format("adjustment-editor-layer", Some(&args)));
             ui.separator();
 
-            let ui_enabled = !state.is_document_edit_interacting() && !layer_locked;
+            let ui_enabled =
+                (!state.is_document_edit_interacting() || state.is_stroking()) && !layer_locked;
             if layer_locked {
                 ui.label(l10n.text("adjustment-editor-locked"));
             }
 
             // Keep the non-shrinking scroll area last so the lock status row reduces its
             // available height instead of increasing the window's remembered desired size.
-            ui.add_enabled_ui(ui_enabled, |ui| {
+            ui.availability_ui(ui_enabled, state.is_stroking(), |ui| {
                 egui::ScrollArea::vertical()
                     .id_salt("adjustment_editor_window_scroll")
                     .auto_shrink([false, false])
@@ -491,7 +493,7 @@ fn draw_gradient_map_contents(
         }
         let can_delete = gradient.stops().len() > 2 && ui_state.gradient_selected_stop.is_some();
         if ui
-            .add_enabled(
+            .add_available(
                 can_delete,
                 egui::Button::new(l10n.text("adjustment-delete-stop")),
             )
