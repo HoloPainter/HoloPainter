@@ -1,0 +1,474 @@
+(
+    schema_version: 1,
+    id: "smudge",
+    display_name: "Smudge Engine",
+
+    capabilities: (
+        spaces: [Uv, Surface],
+        stroke_kinds: [SpacingDab],
+    ),
+    default_stroke: SpacingDab(spacing: 0.25),
+    surface_source_material_scope: BrushFootprint(
+        extra_radius: [
+            BrushRadiusRatio(param: "smudge_length_ratio", scale: 0.5),
+        ],
+    ),
+
+    params: [
+        (
+            name: "opacity",
+            label: "Opacity",
+            ty: F32,
+            exposure: Public,
+            default: 0.75,
+            range: (0.0, 1.0),
+        ),
+        (
+            name: "flow",
+            label: "Flow",
+            ty: F32,
+            exposure: Public,
+            default: 1.0,
+            range: (0.0, 1.0),
+        ),
+        (
+            name: "flow_pressure",
+            label: "Flow Pressure",
+            ty: Dynamics(target: "flow", source: Pressure),
+            exposure: Public,
+            default: (
+                enabled: false,
+                curve: [
+                    (x: 0.0, y: 0.0),
+                    (x: 1.0, y: 1.0),
+                ],
+            ),
+        ),
+        (
+            name: "hardness",
+            label: "Hardness",
+            ty: F32,
+            exposure: Public,
+            default: 0.001,
+            range: (0.0, 1.0),
+        ),
+        (
+            name: "smudge_length_ratio",
+            label: "Length",
+            ty: F32,
+            exposure: Public,
+            default: 1.0,
+            range: (0.0, 3.0),
+        ),
+        (
+            name: "sample_count",
+            label: "Samples",
+            ty: U32,
+            exposure: Public,
+            default: 8,
+        ),
+    ],
+
+    resources: {
+        "source": SurfaceTexture(
+            source: Canvas,
+            extent: PaintSurface,
+            access: [Sampled],
+            sync: BeforeEachBatch,
+        ),
+        "uv_mask": Texture(
+            format: R8Unorm,
+            extent: PaintSurface,
+            lifetime: Stroke,
+            access: [Sampled, RenderAttachment],
+        ),
+        "uv_direction": Texture(
+            format: Rgba16Float,
+            extent: PaintSurface,
+            lifetime: Pass,
+            access: [Sampled, RenderAttachment],
+        ),
+        "canvas": SurfaceTexture(
+            source: Canvas,
+            extent: PaintSurface,
+            access: [RenderAttachment],
+            sync: Live,
+        ),
+        "viewport_source_color": SurfaceTexture(
+            source: ViewportColor,
+            extent: Viewport,
+            access: [Sampled],
+            sync: BeforeSurfaceViewportPass,
+        ),
+        "viewport_depth": SurfaceTexture(
+            source: ViewportDepth,
+            extent: Viewport,
+            access: [Sampled],
+            sync: BeforeSurfaceViewportPass,
+        ),
+        "view_mask": Texture(
+            format: R8Unorm,
+            extent: Viewport,
+            lifetime: Pass,
+            access: [Sampled, RenderAttachment],
+        ),
+        "view_direction": Texture(
+            format: Rgba16Float,
+            extent: Viewport,
+            lifetime: Pass,
+            access: [Sampled, RenderAttachment],
+        ),
+    },
+    pipelines: {
+        "stroke_mask": (
+            raster: UVDabQuadInstances,
+            dab_input: (
+                stream: CurrentBatch,
+                coordinate: Uv,
+                fields: [Position, Radius, Pressure, Direction],
+            ),
+            inputs: {
+                "brush": Uniform(BrushParams),
+            },
+            color_targets: [
+                (
+                    name: "mask",
+                    resource: "uv_mask",
+                    access: RenderAttachment,
+                    load: ClearEveryPass,
+                    clear_value: 0.0,
+                    blend: AlphaAccumulate,
+                ),
+            ],
+            fragment: r#"
+let alpha = brush_falloff(length(in.local_px), dab.radius_px, clamp(brush.hardness, 0.0, 1.0), 1e-4);
+var out: PassOutput;
+out.mask = clamp(alpha * dab.flow, 0.0, 1.0);
+return out;
+"#,
+        ),
+        "stroke_dir": (
+            raster: UVDabQuadInstances,
+            dab_input: (
+                stream: CurrentBatch,
+                coordinate: Uv,
+                fields: [Position, Radius, Pressure, Direction],
+            ),
+            inputs: {
+                "brush": Uniform(BrushParams),
+            },
+            color_targets: [
+                (
+                    name: "dir",
+                    resource: "uv_direction",
+                    access: RenderAttachment,
+                    load: ClearEveryPass,
+                    clear_value: (0.0, 0.0, 0.0, 0.0),
+                    blend: AddClamp,
+                ),
+            ],
+            fragment: r#"
+let alpha = brush_falloff(length(in.local_px), dab.radius_px, clamp(brush.hardness, 0.0, 1.0), 1e-4);
+let deposit = clamp(alpha * dab.flow, 0.0, 1.0);
+let tex_dir = in.dir * brush.tex_size;
+let len2 = dot(tex_dir, tex_dir);
+let dir = select(vec2<f32>(0.0), tex_dir * inverseSqrt(max(len2, 1e-8)), len2 > 1e-8);
+let weight = select(0.0, deposit, len2 > 1e-8);
+var out: PassOutput;
+out.dir = vec4<f32>(dir * weight, 0.0, weight);
+return out;
+"#,
+        ),
+        "uv_smudge_apply": (
+            raster: FullscreenTriangle,
+            inputs: {
+                "source_tex": SampledTexture(resource: "source", sample_type: Float(filterable: true), view_dimension: D2, sampler: LinearClamp),
+                "mask_tex": SampledTexture(resource: "uv_mask", sample_type: Float(filterable: true), view_dimension: D2, sampler: LinearClamp),
+                "dir_tex": SampledTexture(resource: "uv_direction", sample_type: Float(filterable: true), view_dimension: D2, sampler: LinearClamp),
+                "selection_tex": Builtin(SelectionMask),
+                "tex_sampler": Sampler(LinearClamp),
+                "brush": Uniform(BrushParams),
+            },
+            color_targets: [
+                (
+                    name: "color",
+                    resource: "canvas",
+                    access: RenderAttachment,
+                    load: Load,
+                    blend: Replace,
+                ),
+            ],
+            fragment: r#"
+let base = textureSampleLevel(source_tex, source_tex_sampler, in.uv, 0.0);
+let mask = textureSampleLevel(mask_tex, mask_tex_sampler, in.uv, 0.0).r;
+let selection = textureSampleLevel(selection_tex, tex_sampler, in.uv, 0.0).r;
+let strength = clamp(mask * selection * brush.opacity, 0.0, 1.0);
+let smudge_length_px = brush_relative_texture_px(brush.smudge_length_ratio * 0.5);
+if (strength <= 1e-5 || smudge_length_px <= 0.0) {
+    discard;
+}
+
+let dir_dims_u = textureDimensions(dir_tex, 0);
+let dir_dims = vec2<i32>(i32(dir_dims_u.x), i32(dir_dims_u.y));
+let dir_px = clamp(vec2<i32>(floor(in.uv * vec2<f32>(dir_dims))), vec2<i32>(0), dir_dims - vec2<i32>(1));
+let dir_accum = textureLoad(dir_tex, dir_px, 0);
+if (dir_accum.a <= 1e-6) {
+    discard;
+}
+let dir_raw = dir_accum.xy / max(dir_accum.a, 1e-6);
+let dir_len2 = dot(dir_raw, dir_raw);
+if (dir_len2 <= 1e-8) {
+    discard;
+}
+let dir = dir_raw * inverseSqrt(dir_len2);
+let texel = 1.0 / max(brush.tex_size, vec2<f32>(1.0));
+let sample_count = clamp(i32(brush.sample_count), 2, 16);
+var sum = vec4<f32>(0.0);
+var weight_sum = 0.0;
+for (var i = 0; i < 16; i = i + 1) {
+    if (i >= sample_count) {
+        break;
+    }
+    let t = f32(i) / f32(sample_count - 1);
+    let shaped_t = t * t;
+    let weight = 1.0 - t * 0.65;
+    let sample_uv = clamp(in.uv - dir * texel * smudge_length_px * shaped_t, vec2<f32>(0.0), vec2<f32>(1.0));
+    sum += textureSampleLevel(source_tex, source_tex_sampler, sample_uv, 0.0) * weight;
+    weight_sum += weight;
+}
+let smeared = sum / max(weight_sum, 1e-5);
+var out: PassOutput;
+out.color = mix(base, smeared, strength);
+return out;
+"#,
+        ),
+        "viewport_stroke_mask": (
+            raster: ViewportDabQuadInstances,
+            dab_input: (
+                stream: CurrentBatch,
+                coordinate: Viewport,
+                fields: [Position, Radius, Pressure, Direction],
+            ),
+            inputs: {
+                "viewport_depth_tex": SampledTexture(resource: "viewport_depth", sample_type: Float(filterable: false), view_dimension: D2, sampler: NearestClamp),
+                "brush": Uniform(BrushParams),
+                "bake": Uniform(BakeParams),
+            },
+            color_targets: [
+                (
+                    name: "mask",
+                    resource: "view_mask",
+                    access: RenderAttachment,
+                    load: ClearEveryPass,
+                    clear_value: 0.0,
+                    blend: AlphaAccumulate,
+                ),
+            ],
+            fragment: r#"
+if (dab.radius_px <= 0.0) {
+    discard;
+}
+let viewport_size = max(bake.viewport_depth.xy, vec2<f32>(1.0, 1.0));
+if (in.frag_px.x < 0.0 || in.frag_px.x >= viewport_size.x || in.frag_px.y < 0.0 || in.frag_px.y >= viewport_size.y) {
+    discard;
+}
+let px = vec2<i32>(in.frag_px);
+let center = vec2<i32>(clamp(in.center_px, vec2<f32>(0.0), viewport_size - vec2<f32>(1.0)));
+let scene_depth = textureLoad(viewport_depth_tex, px, 0).r;
+let center_depth = textureLoad(viewport_depth_tex, center, 0).r;
+if (scene_depth >= 0.99999 || center_depth >= 0.99999) {
+    discard;
+}
+if (abs(scene_depth - center_depth) > 0.005) {
+    discard;
+}
+let alpha = brush_falloff(length(in.local_px), dab.radius_px, clamp(brush.hardness, 0.0, 1.0), 1e-4);
+var out: PassOutput;
+out.mask = clamp(alpha * dab.flow, 0.0, 1.0);
+return out;
+"#,
+        ),
+        "viewport_stroke_dir": (
+            raster: ViewportDabQuadInstances,
+            dab_input: (
+                stream: CurrentBatch,
+                coordinate: Viewport,
+                fields: [Position, Radius, Pressure, Direction],
+            ),
+            inputs: {
+                "viewport_depth_tex": SampledTexture(resource: "viewport_depth", sample_type: Float(filterable: false), view_dimension: D2, sampler: NearestClamp),
+                "brush": Uniform(BrushParams),
+                "bake": Uniform(BakeParams),
+            },
+            color_targets: [
+                (
+                    name: "dir",
+                    resource: "view_direction",
+                    access: RenderAttachment,
+                    load: ClearEveryPass,
+                    clear_value: (0.0, 0.0, 0.0, 0.0),
+                    blend: AddClamp,
+                ),
+            ],
+            fragment: r#"
+if (dab.radius_px <= 0.0) {
+    discard;
+}
+let viewport_size = max(bake.viewport_depth.xy, vec2<f32>(1.0, 1.0));
+if (in.frag_px.x < 0.0 || in.frag_px.x >= viewport_size.x || in.frag_px.y < 0.0 || in.frag_px.y >= viewport_size.y) {
+    discard;
+}
+let px = vec2<i32>(in.frag_px);
+let center = vec2<i32>(clamp(in.center_px, vec2<f32>(0.0), viewport_size - vec2<f32>(1.0)));
+let scene_depth = textureLoad(viewport_depth_tex, px, 0).r;
+let center_depth = textureLoad(viewport_depth_tex, center, 0).r;
+if (scene_depth >= 0.99999 || center_depth >= 0.99999) {
+    discard;
+}
+if (abs(scene_depth - center_depth) > 0.005) {
+    discard;
+}
+let alpha = brush_falloff(length(in.local_px), dab.radius_px, clamp(brush.hardness, 0.0, 1.0), 1e-4);
+let deposit = clamp(alpha * dab.flow, 0.0, 1.0);
+let len2 = dot(in.dir, in.dir);
+let dir = select(vec2<f32>(0.0), in.dir * inverseSqrt(max(len2, 1e-8)), len2 > 1e-8);
+let weight = select(0.0, deposit, len2 > 1e-8);
+var out: PassOutput;
+out.dir = vec4<f32>(dir * weight, 0.0, weight);
+return out;
+"#,
+        ),
+        "surface_smudge_bake": (
+            raster: TargetMeshUv,
+            inputs: {
+                "source_tex": SampledTexture(resource: "source", sample_type: Float(filterable: true), view_dimension: D2, sampler: LinearClamp),
+                "viewport_color_tex": SampledTexture(resource: "viewport_source_color", sample_type: Float(filterable: true), view_dimension: D2, sampler: LinearClamp),
+                "viewport_depth_tex": SampledTexture(resource: "viewport_depth", sample_type: Float(filterable: false), view_dimension: D2, sampler: NearestClamp),
+                "viewport_stroke_tex": SampledTexture(resource: "view_mask", sample_type: Float(filterable: true), view_dimension: D2, sampler: LinearClamp),
+                "viewport_dir_tex": SampledTexture(resource: "view_direction", sample_type: Float(filterable: true), view_dimension: D2, sampler: LinearClamp),
+                "selection_tex": Builtin(SelectionMask),
+                "tex_sampler": Sampler(LinearClamp),
+                "brush": Uniform(BrushParams),
+                "view": Uniform(ViewProj),
+                "bake": Uniform(BakeParams),
+            },
+            color_targets: [
+                (
+                    name: "color",
+                    resource: "canvas",
+                    access: RenderAttachment,
+                    load: Load,
+                    blend: Replace,
+                ),
+            ],
+            fragment: r#"
+let base = textureSampleLevel(source_tex, source_tex_sampler, in.uv, 0.0);
+let clip = view.view_proj * vec4<f32>(in.world_pos, 1.0);
+if (clip.w <= 1e-6) {
+    discard;
+}
+let ndc = clip.xyz / clip.w;
+let viewport_uv = vec2<f32>(ndc.x * 0.5 + 0.5, 1.0 - (ndc.y * 0.5 + 0.5));
+if (viewport_uv.x < 0.0 || viewport_uv.x > 1.0 || viewport_uv.y < 0.0 || viewport_uv.y > 1.0) {
+    discard;
+}
+
+let viewport_dims = max(bake.viewport_depth.xy, vec2<f32>(1.0));
+let viewport_px = vec2<i32>(
+    clamp(i32(viewport_uv.x * viewport_dims.x), 0, i32(viewport_dims.x) - 1),
+    clamp(i32(viewport_uv.y * viewport_dims.y), 0, i32(viewport_dims.y) - 1)
+);
+let scene_depth = textureLoad(viewport_depth_tex, viewport_px, 0).r;
+if (scene_depth >= 0.99999) {
+    discard;
+}
+let visibility_epsilon = max(bake.viewport_depth.z * 2.0, 0.0005);
+if (abs(ndc.z - scene_depth) > visibility_epsilon) {
+    discard;
+}
+let smudge_length_px = brush_relative_viewport_px(scene_depth, brush.smudge_length_ratio * 0.5);
+
+let view_vec = bake.camera_world.xyz - in.world_pos;
+let view_len = length(view_vec);
+if (view_len <= 1e-6) {
+    discard;
+}
+let facing = abs(dot(normalize(in.normal), view_vec / view_len));
+let normal_falloff = smoothstep(0.0, 0.2, facing);
+let viewport_stroke = textureSampleLevel(viewport_stroke_tex, viewport_stroke_tex_sampler, viewport_uv, 0.0).r;
+let selection = textureSampleLevel(selection_tex, tex_sampler, in.uv, 0.0).r;
+let strength = clamp(viewport_stroke * selection * brush.opacity * normal_falloff, 0.0, 1.0);
+if (strength <= 1e-5 || smudge_length_px <= 0.0) {
+    discard;
+}
+
+let dir_accum = textureLoad(viewport_dir_tex, viewport_px, 0);
+if (dir_accum.a <= 1e-6) {
+    discard;
+}
+let dir_raw = dir_accum.xy / max(dir_accum.a, 1e-6);
+let dir_len2 = dot(dir_raw, dir_raw);
+if (dir_len2 <= 1e-8) {
+    discard;
+}
+let dir = dir_raw * inverseSqrt(dir_len2);
+let texel = 1.0 / viewport_dims;
+let sample_count = clamp(i32(brush.sample_count), 2, 16);
+var sum = vec4<f32>(0.0);
+var weight_sum = 0.0;
+var total_weight = 0.0;
+for (var i = 0; i < 16; i = i + 1) {
+    if (i >= sample_count) {
+        break;
+    }
+    let t = f32(i) / f32(sample_count - 1);
+    let shaped_t = t * t;
+    let weight = 1.0 - t * 0.65;
+    let sample_uv = viewport_uv - dir * texel * smudge_length_px * shaped_t;
+    total_weight += weight;
+    if (sample_uv.x < 0.0 || sample_uv.x > 1.0 || sample_uv.y < 0.0 || sample_uv.y > 1.0) {
+        continue;
+    }
+    let sample_px = vec2<i32>(
+        clamp(i32(sample_uv.x * viewport_dims.x), 0, i32(viewport_dims.x) - 1),
+        clamp(i32(sample_uv.y * viewport_dims.y), 0, i32(viewport_dims.y) - 1)
+    );
+    let sample_depth = textureLoad(viewport_depth_tex, sample_px, 0).r;
+    if (sample_depth >= 0.99999) {
+        continue;
+    }
+    let dz = abs(sample_depth - ndc.z);
+    let reject_epsilon = max(visibility_epsilon * 3.0, 0.001);
+    if (dz > reject_epsilon) {
+        continue;
+    }
+    let depth_sigma = max(visibility_epsilon * 1.5, 0.0005);
+    let depth_weight = exp(-(dz * dz) / (2.0 * depth_sigma * depth_sigma));
+    let sample_weight = weight * depth_weight;
+    sum += textureLoad(viewport_color_tex, sample_px, 0) * sample_weight;
+    weight_sum += sample_weight;
+}
+var smeared = textureLoad(viewport_color_tex, viewport_px, 0);
+if (weight_sum > 1e-5 && weight_sum / max(total_weight, 1e-5) >= 0.35) {
+    smeared = sum / weight_sum;
+}
+var out: PassOutput;
+out.color = mix(base, smeared, strength);
+return out;
+"#,
+        ),
+    },
+
+    passes: {
+        Uv: [
+            (pipeline: "stroke_mask", domain: UvTexture),
+            (pipeline: "stroke_dir", domain: UvTexture),
+            (pipeline: "uv_smudge_apply", domain: UvTexture),
+        ],
+        Surface: [
+            (pipeline: "viewport_stroke_mask", domain: Viewport),
+            (pipeline: "viewport_stroke_dir", domain: Viewport),
+            (pipeline: "surface_smudge_bake", domain: SurfaceProjection),
+        ],
+    },
+)

@@ -1,0 +1,45 @@
+[package]
+name = "holopainter"
+version = "1.0.3"
+edition = "2024"
+rust-version = "1.98"
+
+[dependencies]
+ag-psd = "0.2"
+anyhow = "1.0"
+arboard = "3.6"
+base64 = "0.23"
+bytemuck = { version = "1.24", features = ["derive"] }
+eframe = { version = "0.36", features = ["wgpu"] }
+egui_tiles = "0.17"
+fluent = "0.17"
+fluent-langneg = "0.14"
+glam = "0.33"
+gltf = { version = "1.4", features = ["import", "KHR_texture_transform"] }
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+ron = "0.12"
+raw-window-handle = "0.6"
+rfd = "0.17"
+serde = { version = "1.0", features = ["derive"] }
+slotmap = "1.0"
+sys-locale = "0.3"
+tempfile = "3.23"
+unic-langid = "0.9"
+urlencoding = "2"
+ufbx = "=0.11.3"
+uuid = { version = "1.24", features = ["v4"] }
+zip = { version = "8", default-features = false, features = ["deflate"] }
+zstd = "0.13"
+
+[dev-dependencies]
+pollster = "1"
+
+[build-dependencies]
+embed-resource = "3.0"
+naga = { version = "30", features = ["wgsl-in"] }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = ["Foundation", "Foundation_Collections", "Services_Store", "Win32_Foundation", "Win32_System_WinRT", "Win32_UI_Shell"] }
+windows-collections = "0.3"
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_DataExchange", "Win32_System_LibraryLoader", "Win32_UI_Controls", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Input_Pointer", "Win32_UI_WindowsAndMessaging"] }
+winit = "0.30"

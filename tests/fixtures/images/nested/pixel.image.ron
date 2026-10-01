@@ -1,0 +1,12 @@
+(
+    schema_version: 1,
+    id: "image.test.pixel",
+    display_name: "Pixel",
+    representations: [
+        (
+            id: "texture.test.pixel",
+            format: Rgba8UnormSrgb,
+            source: File(path: "../pixel.png", decode: PngRgba8),
+        ),
+    ],
+)

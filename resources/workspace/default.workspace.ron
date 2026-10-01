@@ -1,0 +1,118 @@
+(
+    schema_version: 1,
+    window: (
+        position: None,
+        inner_size: Some((
+            width: 1200.0,
+            height: 720.0,
+        )),
+        maximized: None,
+    ),
+    root: Linear(
+        direction: horizontal,
+        children: [
+            Linear(
+                direction: vertical,
+                children: [
+                    Tabs(
+                        children: [
+                            Pane(
+                                pane: tool_list,
+                                visible: true,
+                            ),
+                        ],
+                        active: Some(0),
+                        visible: true,
+                    ),
+                    Tabs(
+                        children: [
+                            Pane(
+                                pane: tool_properties,
+                                visible: true,
+                            ),
+                        ],
+                        active: Some(0),
+                        visible: true,
+                    ),
+                    Tabs(
+                        children: [
+                            Pane(
+                                pane: color,
+                                visible: true,
+                            ),
+                        ],
+                        active: Some(0),
+                        visible: true,
+                    ),
+                ],
+                shares: [
+                    0.5622,
+                    0.6848,
+                    0.753,
+                ],
+                visible: true,
+            ),
+            Tabs(
+                children: [
+                    Pane(
+                        pane: viewport3d,
+                        visible: true,
+                    ),
+                ],
+                active: Some(0),
+                visible: true,
+            ),
+            Tabs(
+                children: [
+                    Pane(
+                        pane: uv_view,
+                        visible: true,
+                    ),
+                ],
+                active: Some(0),
+                visible: true,
+            ),
+            Linear(
+                direction: vertical,
+                children: [
+                    Tabs(
+                        children: [
+                            Pane(
+                                pane: meshes,
+                                visible: true,
+                            ),
+                            Pane(
+                                pane: materials_textures,
+                                visible: true,
+                            ),
+                        ],
+                        active: Some(0),
+                        visible: true,
+                    ),
+                    Tabs(
+                        children: [
+                            Pane(
+                                pane: layers,
+                                visible: true,
+                            ),
+                        ],
+                        active: Some(0),
+                        visible: true,
+                    ),
+                ],
+                shares: [
+                    0.1834,
+                    0.5666,
+                ],
+                visible: true,
+            ),
+        ],
+        shares: [
+            0.29,
+            0.63,
+            0.65,
+            0.41,
+        ],
+        visible: true,
+    ),
+)

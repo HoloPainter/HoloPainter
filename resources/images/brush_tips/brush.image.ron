@@ -1,0 +1,14 @@
+(
+    schema_version: 1,
+    id: "image.brush_tip.brush",
+    display_name: "brush",
+    representations: [
+        (
+            id: "texture.brush_tip.brush",
+            format: R8Unorm,
+            source: File(path: "brush.r8", decode: RawR8(width: 27, height: 27)),
+            mipmaps: true,
+            tags: ["brush_tip_mask"],
+        ),
+    ],
+)

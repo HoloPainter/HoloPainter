@@ -1,0 +1,23 @@
+(
+    schema_version: 1,
+    id: "builtin.brush.smudge.soft",
+    display_name: "Smudge",
+    engine_id: "smudge",
+    stroke: (
+        strategy: SpacingDab(spacing: 0.25),
+        input_filter: (stabilization: 0, pressure_filter: 0),
+        pressure_response: (feel: 100.0),
+        size_scene_ratio: (value: 0.01, range: (0.001, 0.2)),
+        size_pressure: (enabled: true, curve: [(x: 0.0, y: 0.0), (x: 1.0, y: 1.0)]),
+    ),
+    engine_params: {
+        "opacity": 0.75,
+        "flow": 1.0,
+        "flow_pressure": (enabled: false, curve: [(x: 0.0, y: 0.0), (x: 1.0, y: 1.0)]),
+        "hardness": 0.001,
+        "smudge_length_ratio": 1.0,
+        "sample_count": 8,
+    },
+    quick_params: [Common(Size), Engine("opacity"), Engine("smudge_length_ratio")],
+    tags: ["paint", "smudge"],
+)

@@ -1,0 +1,24 @@
+(
+    schema_version: 1,
+    id: "builtin.brush.default",
+    display_name: "Default Brush",
+    engine_id: "paint",
+    stroke: (
+        strategy: SpacingDab(spacing: 0.18),
+        input_filter: (stabilization: 0, pressure_filter: 0),
+        pressure_response: (feel: 100.0),
+        size_scene_ratio: (value: 0.01, range: (0.001, 0.2)),
+        size_pressure: (enabled: true, curve: [(x: 0.0, y: 0.0), (x: 1.0, y: 1.0)]),
+    ),
+    engine_params: {
+        "composite_mode": "source_over",
+        "opacity": 1.0,
+        "flow": 0.8,
+        "flow_pressure": (enabled: true, curve: [(x: 0.0, y: 0.0), (x: 1.0, y: 1.0)]),
+        "shape": "procedural_round",
+        "hardness": 0.65,
+        "anti_aliasing": true,
+    },
+    quick_params: [Common(Size), Engine("opacity"), Engine("flow")],
+    tags: ["template"],
+)

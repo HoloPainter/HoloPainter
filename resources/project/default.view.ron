@@ -1,0 +1,42 @@
+(
+    viewport_3d: (
+        camera: (
+            target: (0.0, 0.0, 0.0),
+            orientation: (0.056178, -0.91624355, 0.13847667, 0.37170687),
+            distance: 3.0,
+            projection: Perspective,
+            fov_y_radians: 0.87266463,
+            orthographic_height: 2.797846,
+        ),
+        shading: shade,
+        gizmo_visible: true,
+        background_color: (0.0, 0.0, 0.0),
+        wireframe: (
+            visible: true,
+            color: (0.2, 0.2, 0.2),
+            opacity: 0.8,
+        ),
+        scene_visibility: (
+            hidden_mesh_object_ids: [],
+            hidden_material_ids: [],
+        ),
+        surface_mirror: (
+            x_enabled: false,
+            x_plane: 0.0,
+            x_plane_visible: true,
+        ),
+    ),
+    uv: (
+        transform: (
+            center_uv: (0.5, 0.5),
+            zoom: 1.0,
+            rotation_radians: 0.0,
+        ),
+        background_color: (0.0, 0.0, 0.0),
+        wireframe: (
+            visible: true,
+            color: (0.2, 0.2, 0.2),
+            opacity: 0.8,
+        ),
+    ),
+)

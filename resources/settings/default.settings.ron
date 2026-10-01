@@ -1,0 +1,20 @@
+(
+    schema_version: 1,
+    settings: (
+        appearance: (
+            theme: dark,
+            language: system,
+        ),
+        input: (
+            tablet: (
+                backend: wintab,
+                pressure_curve: [
+                    (x: 0.0, y: 0.0),
+                    (x: 0.3, y: 0.1),
+                    (x: 0.8, y: 0.5),
+                    (x: 1.0, y: 1.0),
+                ],
+            ),
+        ),
+    ),
+)

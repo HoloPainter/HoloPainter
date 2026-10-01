@@ -1,0 +1,14 @@
+(
+    schema_version: 1,
+    id: "image.brush_tip.flat_64",
+    display_name: "Flat 64",
+    representations: [
+        (
+            id: "texture.brush_tip.flat_64",
+            format: R8Unorm,
+            source: File(path: "flat_64.r8", decode: RawR8(width: 64, height: 64)),
+            mipmaps: true,
+            tags: ["brush_tip_mask"],
+        ),
+    ],
+)

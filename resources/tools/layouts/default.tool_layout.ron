@@ -1,0 +1,99 @@
+(
+    schema_version: 1,
+    id: "default.tool_layout",
+    display_name: "Default",
+
+    tools: [
+        (
+            id: "tool.brush",
+            display_name: "Brush",
+            icon: Some("builtin.icon.brush"),
+            entries: [
+                BrushPreset("builtin.brush.paint.basic_brush"),
+                BrushPreset("builtin.brush.paint.pen"),
+                BrushPreset("builtin.brush.paint.marker"),
+                BrushPreset("builtin.brush.paint.directional_flat"),
+            ],
+        ),
+        (
+            id: "tool.airbrush",
+            display_name: "Airbrush",
+            icon: Some("builtin.icon.fragrance"),
+            entries: [
+                BrushPreset("builtin.brush.airbrush.soft"),
+            ],
+        ),
+        (
+            id: "tool.eraser",
+            display_name: "Eraser",
+            icon: Some("builtin.icon.eraser"),
+            entries: [
+                BrushPreset("builtin.brush.eraser.round"),
+            ],
+        ),
+        (
+            id: "tool.filter_brush",
+            display_name: "Filter Brush",
+            icon: Some("builtin.icon.stylus_brush"),
+            entries: [
+                BrushPreset("builtin.brush.filter.blur"),
+                BrushPreset("builtin.brush.filter.smudge"),
+            ],
+        ),
+        (
+            id: "tool.fill",
+            display_name: "Fill",
+            icon: Some("builtin.icon.colors"),
+            entries: [
+                BuiltinTool("builtin.tool.fill.material"),
+                BuiltinTool("builtin.tool.fill.mesh"),
+                BuiltinTool("builtin.tool.fill.polygon"),
+            ],
+        ),
+        (
+            id: "tool.shape",
+            display_name: "Shape",
+            icon: Some("builtin.icon.shapes"),
+            entries: [
+                BuiltinTool("builtin.tool.shape.rectangle_paint"),
+                // BuiltinTool("builtin.tool.shape.rectangle_erase"),
+                BuiltinTool("builtin.tool.shape.lasso_paint"),
+                // BuiltinTool("builtin.tool.shape.lasso_erase"),
+            ],
+        ),
+        (
+            id: "tool.sampler",
+            display_name: "Sampler",
+            icon: Some("builtin.icon.colorize"),
+            entries: [
+                BuiltinTool("builtin.tool.sampler.color_picker"),
+            ],
+        ),
+        (
+            id: "tool.selection",
+            display_name: "Selection",
+            icon: Some("builtin.icon.select"),
+            entries: [
+                BuiltinTool("builtin.tool.selection.rectangle"),
+                BuiltinTool("builtin.tool.selection.lasso"),
+            ],
+        ),
+        (
+            id: "tool.decal",
+            display_name: "Decal",
+            icon: Some("builtin.icon.sticker"),
+            entries: [
+                BuiltinTool("builtin.tool.decal.surface"),
+                BuiltinTool("builtin.tool.decal.view_projection"),
+            ],
+        ),
+        (
+            id: "tool.transform",
+            display_name: "Transform",
+            icon: Some("builtin.icon.transform"),
+            entries: [
+                BuiltinTool("builtin.tool.transform"),
+            ],
+        ),
+    ],
+)

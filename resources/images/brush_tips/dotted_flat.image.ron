@@ -1,0 +1,14 @@
+(
+    schema_version: 1,
+    id: "image.brush_tip.dotted_flat",
+    display_name: "dotted-flat",
+    representations: [
+        (
+            id: "texture.brush_tip.dotted_flat",
+            format: R8Unorm,
+            source: File(path: "dotted_flat.r8", decode: RawR8(width: 27, height: 27)),
+            mipmaps: true,
+            tags: ["brush_tip_mask"],
+        ),
+    ],
+)

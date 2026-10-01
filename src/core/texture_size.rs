@@ -1,0 +1,2 @@
+pub const DEFAULT_TEXTURE_SIZE: u32 = 1024;
+pub const TEXTURE_SIZE_CHOICES: [u32; 6] = [128, 256, 512, 1024, 2048, 4096];

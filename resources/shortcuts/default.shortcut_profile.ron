@@ -1,0 +1,97 @@
+(
+    schema_version: 1,
+    id: "default",
+    display_name: "Default",
+    tool_tap_timeout_ms: 250,
+    bindings: [
+        Invoke(chord: (key: O, ctrl: true), action: OpenProject),
+        Invoke(chord: (key: S, ctrl: true), action: SaveProject),
+        Invoke(chord: (key: S, ctrl: true, shift: true), action: SaveProjectAs),
+        Invoke(chord: (key: Z, ctrl: true), action: Undo),
+        Invoke(chord: (key: Z, ctrl: true, shift: true), action: Redo),
+        Invoke(chord: (key: Y, ctrl: true), action: Redo),
+        Invoke(chord: (key: X, ctrl: true), action: CutImage),
+        Invoke(chord: (key: C, ctrl: true), action: CopyImage),
+        Invoke(chord: (key: V, ctrl: true), action: PasteImage),
+        Invoke(chord: (key: A, ctrl: true), action: SelectAll),
+        Invoke(chord: (key: I, ctrl: true), action: InvertSelection),
+        Invoke(chord: (key: D, ctrl: true), action: Deselect),
+        Invoke(chord: (key: Delete), action: DeleteSelectedPixels),
+        Invoke(chord: (key: T, ctrl: true), action: BeginTransformMode),
+        Invoke(chord: (key: Enter), action: ApplyActiveOperation),
+        Invoke(chord: (key: Escape), action: CancelActiveOperation),
+
+        PressOrHoldTool(key: B, target: ToolGroup("tool.brush")),
+        PressOrHoldTool(key: W, target: ToolGroup("tool.airbrush")),
+        PressOrHoldTool(key: E, target: ToolGroup("tool.eraser")),
+        PressOrHoldTool(key: J, target: ToolGroup("tool.filter_brush")),
+        PressOrHoldTool(key: D, target: ToolGroup("tool.decal")),
+        PressOrHoldTool(key: T, target: ToolGroup("tool.transform")),
+        PressOrHoldTool(key: F, target: ToolGroup("tool.fill")),
+        PressOrHoldTool(key: U, target: ToolGroup("tool.shape")),
+        PressOrHoldTool(key: S, target: ToolGroup("tool.selection")),
+        PressOrHoldTool(key: I, target: ToolGroup("tool.sampler")),
+
+        HoldOverride(
+            modifiers: (ctrl: true),
+            target: ActiveToolOverride("erase"),
+        ),
+
+        PointerGesture(
+            context: Viewport3d,
+            trigger: (button: Primary, modifiers: (alt: true)),
+            action: Orbit3d,
+        ),
+        PointerGesture(
+            context: Viewport3d,
+            trigger: (button: Secondary),
+            action: Orbit3d,
+        ),
+        PointerGesture(
+            context: Viewport3d,
+            trigger: (button: Middle),
+            action: Pan3d,
+        ),
+        PointerGesture(
+            context: Viewport3d,
+            trigger: (button: Middle, modifiers: (alt: true)),
+            action: Pan3d,
+        ),
+        PointerGesture(
+            context: Viewport3d,
+            trigger: (button: Secondary, modifiers: (alt: true)),
+            action: Zoom3d,
+        ),
+        PointerGesture(
+            context: Viewport3d,
+            trigger: (button: Primary, modifiers: (ctrl: true, alt: true)),
+            action: BrushSize,
+        ),
+
+        PointerGesture(
+            context: Uv,
+            trigger: (button: Primary, modifiers: (alt: true)),
+            action: RotateUv,
+        ),
+        PointerGesture(
+            context: Uv,
+            trigger: (button: Middle),
+            action: PanUv,
+        ),
+        PointerGesture(
+            context: Uv,
+            trigger: (button: Middle, modifiers: (alt: true)),
+            action: PanUv,
+        ),
+        PointerGesture(
+            context: Uv,
+            trigger: (button: Secondary, modifiers: (alt: true)),
+            action: ZoomUv,
+        ),
+        PointerGesture(
+            context: Uv,
+            trigger: (button: Primary, modifiers: (ctrl: true, alt: true)),
+            action: BrushSize,
+        ),
+    ],
+)

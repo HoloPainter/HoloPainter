@@ -1,0 +1,395 @@
+(
+    schema_version: 1,
+    id: "paint",
+    display_name: "Paint Engine",
+
+    capabilities: (
+        spaces: [Uv, Surface],
+        stroke_kinds: [SpacingDab, ContinuousDab],
+    ),
+    default_stroke: SpacingDab(spacing: 0.18),
+    surface_source_material_scope: BrushFootprint(extra_radius: []),
+
+    params: [
+        (
+            name: "composite_mode",
+            label: "Composite Mode",
+            ty: Enum(
+                variants: [
+                    (name: "source_over", label: "Color", value: 0),
+                    (name: "destination_out", label: "Erase", value: 1),
+                    (name: "multiply", label: "Multiply", value: 3),
+                ],
+            ),
+            exposure: Public,
+            default: "source_over",
+        ),
+        (
+            name: "opacity",
+            label: "Opacity",
+            ty: F32,
+            exposure: Public,
+            default: 1.0,
+            range: (0.0, 1.0),
+        ),
+        (
+            name: "flow",
+            label: "Flow",
+            ty: F32,
+            exposure: Public,
+            default: 0.8,
+            range: (0.0, 1.0),
+        ),
+        (
+            name: "flow_pressure",
+            label: "Flow Pressure",
+            ty: Dynamics(target: "flow", source: Pressure),
+            exposure: Public,
+            default: (
+                enabled: true,
+                curve: [
+                    (x: 0.0, y: 0.0),
+                    (x: 1.0, y: 1.0),
+                ],
+            ),
+        ),
+        (
+            name: "shape",
+            label: "Shape",
+            ty: Enum(
+                variants: [
+                    (name: "procedural_round", label: "Round", value: 0),
+                    (name: "texture_mask", label: "Texture Mask", value: 1),
+                ],
+            ),
+            exposure: Public,
+            default: "procedural_round",
+        ),
+        (
+            name: "hardness",
+            label: "Hardness",
+            ty: F32,
+            exposure: Public,
+            default: 0.65,
+            range: (0.0, 1.0),
+            active_when: Equals(
+                param: "shape",
+                value: Enum("procedural_round"),
+            ),
+        ),
+        (
+            name: "tip_mask",
+            label: "Brush Tip",
+            ty: ResourceRef(kind: Texture, tags: ["brush_tip_mask"]),
+            editor: ResourceThumbnailGrid,
+            exposure: Public,
+            default: Resource("texture.brush_tip.brush"),
+            active_when: Equals(
+                param: "shape",
+                value: Enum("texture_mask"),
+            ),
+        ),
+        (
+            name: "tip_rotation",
+            label: "Tip Rotation",
+            ty: Enum(
+                variants: [
+                    (name: "fixed", label: "Fixed", value: 0),
+                    (name: "stroke_direction", label: "Stroke Direction", value: 1),
+                ],
+            ),
+            exposure: Public,
+            default: "fixed",
+            active_when: Equals(
+                param: "shape",
+                value: Enum("texture_mask"),
+            ),
+        ),
+        (
+            name: "anti_aliasing",
+            label: "Anti Aliasing",
+            ty: Bool,
+            exposure: Public,
+            default: true,
+        ),
+    ],
+
+    transient_overrides: {
+        "erase": (
+            display_name: "Erase",
+            params: {
+                "composite_mode": "destination_out",
+            },
+        ),
+    },
+
+    resources: {
+        "tip_mask_tex": TextureAsset(
+            source: RefParam(param: "tip_mask"),
+            format: R8Unorm,
+            access: [Sampled],
+        ),
+        "stroke_snapshot": SurfaceTexture(
+            source: Canvas,
+            extent: PaintSurface,
+            access: [Sampled],
+            sync: StrokeBeginSnapshot,
+        ),
+        "paint_mask": Texture(
+            format: R8Unorm,
+            extent: PaintSurface,
+            lifetime: Stroke,
+            access: [Sampled, RenderAttachment],
+        ),
+        "canvas": SurfaceTexture(
+            source: Canvas,
+            extent: PaintSurface,
+            access: [RenderAttachment],
+            sync: Live,
+        ),
+    },
+    pipelines: {
+        "stroke_mask": (
+            raster: UVDabQuadInstances,
+            dab_input: (
+                stream: CurrentBatch,
+                coordinate: Uv,
+                fields: [Position, Radius, Pressure, Direction],
+            ),
+            inputs: {
+                "tip_mask_tex": SampledTexture(resource: "tip_mask_tex", sample_type: Float(filterable: true), view_dimension: D2, sampler: LinearClamp),
+                "brush": Uniform(BrushParams),
+            },
+            color_targets: [
+                (
+                    name: "mask",
+                    resource: "paint_mask",
+                    access: RenderAttachment,
+                    load: ClearOnStrokeBegin,
+                    clear_value: 0.0,
+                    blend: AlphaAccumulate,
+                ),
+            ],
+            fragment: r#"
+let hardness = clamp(brush.hardness, 0.0, 1.0);
+var mask = 0.0;
+if (brush.shape == shape_procedural_round) {
+    mask = brush_paint_alpha(length(in.local_px), dab.radius_px, hardness, brush.anti_aliasing, 1e-4);
+} else {
+    var tip_local = in.local_px;
+    if (brush.tip_rotation == tip_rotation_stroke_direction) {
+        let tex_dir = dab.direction * max(brush.tex_size, vec2<f32>(1.0, 1.0));
+        if (dot(tex_dir, tex_dir) <= 1e-8) {
+            discard;
+        }
+        let direction = normalize(tex_dir);
+        let axis_y = vec2<f32>(-direction.y, direction.x);
+        tip_local = vec2<f32>(
+            dot(in.local_px, direction),
+            dot(in.local_px, axis_y),
+        );
+    }
+    mask = sample_local_alpha_texture(tip_mask_tex, tip_mask_tex_sampler, tip_local, dab.radius_px, brush.anti_aliasing, 1e-5);
+}
+let coverage_gain = brush_subpixel_coverage_gain(dab.radius_px);
+let uncompensated_mask = clamp(mask * coverage_gain * dab.flow, 0.0, 1.0);
+var out: PassOutput;
+out.mask = brush_spacing_alpha_compensate(uncompensated_mask, dab.spacing_alpha_scale);
+return out;
+"#,
+        ),
+        "surface_stroke_mask": (
+            raster: TargetMeshUv,
+            dab_input: (
+                stream: CurrentBatch,
+                coordinate: Surface,
+                fields: [WorldPosition, WorldNormal, TangentX, TangentY, RadiusWorld, Pressure, Direction],
+            ),
+            inputs: {
+                "dabs": Builtin(CurrentDabBatch),
+                "tip_mask_tex": SampledTexture(resource: "tip_mask_tex", sample_type: Float(filterable: true), view_dimension: D2, sampler: LinearClamp),
+                "brush": Uniform(BrushParams),
+            },
+            color_targets: [
+                (
+                    name: "mask",
+                    resource: "paint_mask",
+                    access: RenderAttachment,
+                    load: ClearOnStrokeBegin,
+                    clear_value: 0.0,
+                    blend: AlphaAccumulate,
+                ),
+            ],
+            fragment: r#"
+var alpha = 0.0;
+let hardness = clamp(brush.hardness, 0.0, 1.0);
+let normal = normalize(in.normal);
+for (var i = 0u; i < dabs.count; i = i + 1u) {
+    let current = dabs.items[i];
+    let dab = brush_dab_from_current(current);
+    let center = current.center_radius.xyz;
+    let radius = max(dab.radius_world, 1e-6);
+    let dab_normal = normalize(current.normal_pressure.xyz);
+    let normal_agree = dot(normal, dab_normal);
+    if (normal_agree < 0.25) {
+        continue;
+    }
+
+    let delta = in.world_pos - center;
+    let plane_distance = dot(delta, dab_normal);
+    if (abs(plane_distance) > radius * 0.5) {
+        continue;
+    }
+
+    let planar = delta - dab_normal * plane_distance;
+    let radial_distance = length(planar);
+    let normal_weight = smoothstep(0.25, 1.0, normal_agree);
+
+    var local_world = vec2<f32>(0.0, 0.0);
+    if (brush.shape == shape_texture_mask) {
+        if (brush.tip_rotation == tip_rotation_stroke_direction && dot(dab.direction, dab.direction) <= 1e-8) {
+            continue;
+        }
+        let tangent_x = normalize(current.tangent_x_pad.xyz);
+        let tangent_y = normalize(current.tangent_y_pad.xyz);
+        local_world = vec2<f32>(
+            dot(planar, tangent_x),
+            dot(planar, tangent_y),
+        );
+        if (brush.tip_rotation == tip_rotation_stroke_direction) {
+            let direction = normalize(dab.direction);
+            let axis_y = vec2<f32>(-direction.y, direction.x);
+            local_world = vec2<f32>(
+                dot(local_world, direction),
+                dot(local_world, axis_y),
+            );
+        }
+    }
+
+    var dab_alpha = 0.0;
+    if (brush.shape == shape_procedural_round) {
+        dab_alpha = brush_paint_alpha(radial_distance, radius, hardness, brush.anti_aliasing, 1e-6);
+    } else {
+        dab_alpha = sample_local_alpha_texture(tip_mask_tex, tip_mask_tex_sampler, local_world, radius, brush.anti_aliasing, 1e-5);
+    }
+    dab_alpha = dab_alpha * dab.flow * normal_weight;
+    alpha = alpha + dab_alpha * (1.0 - alpha);
+}
+var out: PassOutput;
+out.mask = clamp(alpha, 0.0, 1.0);
+return out;
+"#,
+        ),
+        "uv_composite": (
+            raster: FullscreenTriangle,
+            inputs: {
+                "base_tex": SampledTexture(resource: "stroke_snapshot", sample_type: Float(filterable: true), view_dimension: D2, sampler: LinearClamp),
+                "stroke_accum_tex": SampledTexture(resource: "paint_mask", sample_type: Float(filterable: true), view_dimension: D2, sampler: LinearClamp),
+                "selection_tex": Builtin(SelectionMask),
+                "tex_sampler": Sampler(LinearClamp),
+                "brush": Uniform(BrushParams),
+            },
+            color_targets: [
+                (
+                    name: "color",
+                    resource: "canvas",
+                    access: RenderAttachment,
+                    load: Load,
+                    blend: Replace,
+                ),
+            ],
+            fragment: r#"
+let base = textureSampleLevel(base_tex, base_tex_sampler, in.uv, 0.0);
+let accum = textureSampleLevel(stroke_accum_tex, stroke_accum_tex_sampler, in.uv, 0.0).r;
+let selection = textureSampleLevel(selection_tex, tex_sampler, in.uv, 0.0).r;
+let blend_alpha = clamp(accum * selection * brush.opacity, 0.0, 1.0);
+
+var color = base;
+if (brush.composite_mode == composite_mode_multiply) {
+    let sa = blend_alpha;
+    let da = clamp(base.a, 0.0, 1.0);
+    let src = clamp(brush.color_rgb_pad.rgb, vec3<f32>(0.0), vec3<f32>(1.0));
+    let dst = select(vec3<f32>(0.0), clamp(base.rgb / base.a, vec3<f32>(0.0), vec3<f32>(1.0)), base.a > 1e-5);
+    let blended = src * dst;
+    let out_a = sa + da * (1.0 - sa);
+    let out_rgb = blended * sa * da
+        + src * sa * (1.0 - da)
+        + dst * da * (1.0 - sa);
+    color = vec4<f32>(clamp(out_rgb, vec3<f32>(0.0), vec3<f32>(1.0)), out_a);
+} else if (brush.composite_mode == composite_mode_destination_out) {
+    let erased_alpha = clamp(base.a - blend_alpha, 0.0, 1.0);
+    let rgb_scale = select(0.0, erased_alpha / base.a, base.a > 1e-5);
+    color = vec4<f32>(base.rgb * rgb_scale, erased_alpha);
+} else {
+    let rgb = mix(base.rgb, brush.color_rgb_pad.rgb, blend_alpha);
+    color = vec4<f32>(rgb, mix(base.a, 1.0, blend_alpha));
+}
+
+var out: PassOutput;
+out.color = color;
+return out;
+"#,
+        ),
+        "surface_composite": (
+            raster: TargetMeshUv,
+            inputs: {
+                "base_tex": SampledTexture(resource: "stroke_snapshot", sample_type: Float(filterable: true), view_dimension: D2, sampler: LinearClamp),
+                "stroke_accum_tex": SampledTexture(resource: "paint_mask", sample_type: Float(filterable: true), view_dimension: D2, sampler: LinearClamp),
+                "selection_tex": Builtin(SelectionMask),
+                "tex_sampler": Sampler(LinearClamp),
+                "brush": Uniform(BrushParams),
+            },
+            color_targets: [
+                (
+                    name: "color",
+                    resource: "canvas",
+                    access: RenderAttachment,
+                    load: Load,
+                    blend: Replace,
+                ),
+            ],
+            fragment: r#"
+let base = textureSampleLevel(base_tex, base_tex_sampler, in.uv, 0.0);
+let accum = textureSampleLevel(stroke_accum_tex, stroke_accum_tex_sampler, in.uv, 0.0).r;
+let selection = textureSampleLevel(selection_tex, tex_sampler, in.uv, 0.0).r;
+let blend_alpha = clamp(accum * selection * brush.opacity, 0.0, 1.0);
+
+var color = base;
+if (brush.composite_mode == composite_mode_multiply) {
+    let sa = blend_alpha;
+    let da = clamp(base.a, 0.0, 1.0);
+    let src = clamp(brush.color_rgb_pad.rgb, vec3<f32>(0.0), vec3<f32>(1.0));
+    let dst = select(vec3<f32>(0.0), clamp(base.rgb / base.a, vec3<f32>(0.0), vec3<f32>(1.0)), base.a > 1e-5);
+    let blended = src * dst;
+    let out_a = sa + da * (1.0 - sa);
+    let out_rgb = blended * sa * da
+        + src * sa * (1.0 - da)
+        + dst * da * (1.0 - sa);
+    color = vec4<f32>(clamp(out_rgb, vec3<f32>(0.0), vec3<f32>(1.0)), out_a);
+} else if (brush.composite_mode == composite_mode_destination_out) {
+    let erased_alpha = clamp(base.a - blend_alpha, 0.0, 1.0);
+    let rgb_scale = select(0.0, erased_alpha / base.a, base.a > 1e-5);
+    color = vec4<f32>(base.rgb * rgb_scale, erased_alpha);
+} else {
+    let rgb = mix(base.rgb, brush.color_rgb_pad.rgb, blend_alpha);
+    color = vec4<f32>(rgb, mix(base.a, 1.0, blend_alpha));
+}
+
+var out: PassOutput;
+out.color = color;
+return out;
+"#,
+        ),
+    },
+
+    passes: {
+        Uv: [
+            (pipeline: "stroke_mask", domain: UvTexture),
+            (pipeline: "uv_composite", domain: UvTexture),
+        ],
+        Surface: [
+            (pipeline: "surface_stroke_mask", domain: SurfaceProjection),
+            (pipeline: "surface_composite", domain: SurfaceProjection),
+        ],
+    },
+)

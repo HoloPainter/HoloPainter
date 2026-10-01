@@ -1,0 +1,14 @@
+(
+    schema_version: 1,
+    id: "image.brush_tip.smoke",
+    display_name: "smoke",
+    representations: [
+        (
+            id: "texture.brush_tip.smoke",
+            format: R8Unorm,
+            source: File(path: "smoke.r8", decode: RawR8(width: 256, height: 256)),
+            mipmaps: true,
+            tags: ["brush_tip_mask"],
+        ),
+    ],
+)
