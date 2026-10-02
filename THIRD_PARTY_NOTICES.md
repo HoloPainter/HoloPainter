@@ -474,6 +474,10 @@ Some dependencies listed above are distributed under one or more of the followin
 
 Where required for binary redistribution, the complete applicable license texts and copyright notices should be distributed together with HoloPainter.
 
+License texts for the bundled font, icons, and Zstandard are collected in `third_party/`.
+See `third_party/README.md` for file locations and original sources.
+The Zstandard BSD license is included in `third_party/Zstandard-BSD-3-Clause.txt`.
+
 For source distributions, the authoritative license information for each Rust dependency can also be found in that dependency's Cargo package metadata and source distribution.
 
 ---
