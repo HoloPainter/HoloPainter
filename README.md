@@ -2,9 +2,9 @@
 
 HoloPainter is a desktop painting application for painting textures directly on 3D models. It is written in Rust, with egui for the UI and wgpu for GPU rendering.
 
-## Demo Video
+## Demo
 
-https://github.com/user-attachments/assets/8b036935-09b6-4bee-95dd-338ce8be1140
+https://github.com/user-attachments/assets/f7125053-4f89-4859-96c3-54ed45e17c2f
 
 ## Features
 
